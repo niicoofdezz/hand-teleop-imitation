@@ -1,0 +1,16 @@
+# Entorno virtual (se regenera con requirements, no se sube)
+.venv/
+
+# Caché de Python
+__pycache__/
+*.pyc
+
+# Datos, modelos y resultados (pesan mucho; más adelante irán a Hugging Face)
+data/
+outputs/
+*.task
+*.pt
+*.safetensors
+
+# Código de terceros que clonaremos aparte
+third_party/
