@@ -5,7 +5,7 @@ mujoco
 mink
 mediapipe
 pyyaml
-lerobot
+lerobot[dataset]
 # LeRobot instala opencv-python-headless (sin ventanas). Después de instalar:
 #   pip uninstall -y opencv-python-headless opencv-python opencv-contrib-python
 #   pip install "opencv-contrib-python<4.14"
