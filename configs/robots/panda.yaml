@@ -1,0 +1,22 @@
+# Franka Emika Panda (MuJoCo Menagerie)
+# Todo lo específico del robot vive aquí: cambiar de robot = cambiar de YAML.
+
+name: panda
+mjcf: third_party/mujoco_menagerie/franka_emika_panda/panda.xml
+
+# Articulaciones del brazo, en orden base -> muñeca (las que mueve la IK)
+arm_joints: [joint1, joint2, joint3, joint4, joint5, joint6, joint7]
+# Actuador de posición asociado a cada articulación (mismo orden)
+arm_actuators: [actuator1, actuator2, actuator3, actuator4, actuator5, actuator6, actuator7]
+
+gripper:
+  actuator: actuator8
+  ctrl_open: 255.0     # rango del actuador en panda.xml: 0..255
+  ctrl_closed: 0.0
+
+end_effector:
+  body: hand                     # cuerpo al que se fija el punto de trabajo
+  tcp_name: tcp                  # nombre del site que creamos al cargar
+  tcp_offset: [0.0, 0.0, 0.1034] # m, en el marco de 'hand': punto entre las yemas
+
+home_keyframe: home   # postura inicial definida en panda.xml

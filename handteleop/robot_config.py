@@ -1,0 +1,119 @@
+"""Configuración del robot: leer el YAML, validarlo y construir el modelo MuJoCo.
+
+Idea clave: el resto del código NUNCA escribe "joint1" o "actuator8" a mano.
+Pide los nombres a RobotConfig. Así, cambiar de robot = cambiar de YAML.
+"""
+from dataclasses import dataclass
+from pathlib import Path
+
+import mujoco
+import numpy as np
+import yaml
+
+# Raíz del repo: este archivo está en <repo>/handteleop/robot_config.py
+REPO_ROOT = Path(__file__).resolve().parent.parent
+
+
+@dataclass
+class GripperConfig:
+    actuator: str
+    ctrl_open: float
+    ctrl_closed: float
+
+
+@dataclass
+class EndEffectorConfig:
+    body: str
+    tcp_name: str
+    tcp_offset: list[float]
+
+
+@dataclass
+class RobotConfig:
+    name: str
+    mjcf: Path
+    arm_joints: list[str]
+    arm_actuators: list[str]
+    gripper: GripperConfig
+    end_effector: EndEffectorConfig
+    home_keyframe: str
+
+    @classmethod
+    def from_yaml(cls, path: str | Path) -> "RobotConfig":
+        """Lee el YAML y lo convierte en objetos con tipos (no diccionarios sueltos)."""
+        path = Path(path)
+        if not path.is_absolute():
+            path = REPO_ROOT / path
+        with open(path) as f:
+            raw = yaml.safe_load(f)
+
+        cfg = cls(
+            name=raw["name"],
+            mjcf=REPO_ROOT / raw["mjcf"],
+            arm_joints=raw["arm_joints"],
+            arm_actuators=raw["arm_actuators"],
+            gripper=GripperConfig(**raw["gripper"]),
+            end_effector=EndEffectorConfig(**raw["end_effector"]),
+            home_keyframe=raw["home_keyframe"],
+        )
+        cfg._check_basic()
+        return cfg
+
+    def _check_basic(self) -> None:
+        """Errores que se pueden detectar sin abrir MuJoCo."""
+        if not self.mjcf.exists():
+            raise FileNotFoundError(f"[{self.name}] No existe el MJCF: {self.mjcf}")
+        if len(self.arm_joints) != len(self.arm_actuators):
+            raise ValueError(f"[{self.name}] arm_joints y arm_actuators deben tener la misma longitud")
+        if len(self.end_effector.tcp_offset) != 3:
+            raise ValueError(f"[{self.name}] tcp_offset debe tener 3 valores (x, y, z)")
+
+    @property
+    def n_arm(self) -> int:
+        return len(self.arm_joints)
+
+
+def build_model(cfg: RobotConfig) -> mujoco.MjModel:
+    """Carga el MJCF, añade el site del TCP y compila el modelo.
+
+    Usamos MjSpec (edición del modelo desde Python) para no tocar los archivos
+    de Menagerie: el TCP es una decisión NUESTRA, así que vive en nuestro config.
+    """
+    spec = mujoco.MjSpec.from_file(str(cfg.mjcf))
+    ee = cfg.end_effector
+    body = spec.body(ee.body)
+    if body is None:
+        raise ValueError(f"[{cfg.name}] El cuerpo '{ee.body}' no existe en el MJCF")
+    body.add_site(name=ee.tcp_name, pos=ee.tcp_offset, size=[0.01, 0.01, 0.01],
+                  rgba=[1, 0, 0, 1])  # esfera roja: así se ve en el visor
+    model = spec.compile()
+    validate_against_model(cfg, model)
+    return model
+
+
+def validate_against_model(cfg: RobotConfig, model: mujoco.MjModel) -> None:
+    """Comprueba que todos los nombres del YAML existen en el modelo.
+
+    Si te equivocas al escribir un nombre, mejor un error claro ahora que un
+    comportamiento raro dentro de la IK dentro de dos semanas.
+    """
+    checks = (
+        [(mujoco.mjtObj.mjOBJ_JOINT, n) for n in cfg.arm_joints]
+        + [(mujoco.mjtObj.mjOBJ_ACTUATOR, n) for n in cfg.arm_actuators]
+        + [(mujoco.mjtObj.mjOBJ_ACTUATOR, cfg.gripper.actuator),
+           (mujoco.mjtObj.mjOBJ_KEY, cfg.home_keyframe)]
+    )
+    missing = [name for obj, name in checks if mujoco.mj_name2id(model, obj, name) == -1]
+    if missing:
+        raise ValueError(f"[{cfg.name}] Nombres que no existen en el modelo: {missing}")
+
+
+def reset_to_home(cfg: RobotConfig, model: mujoco.MjModel, data: mujoco.MjData) -> None:
+    """Pone el robot en la postura 'home' (posición y consignas de los actuadores)."""
+    mujoco.mj_resetDataKeyframe(model, data, model.key(cfg.home_keyframe).id)
+    mujoco.mj_forward(model, data)  # recalcula posiciones de cuerpos y sites
+
+
+def tcp_position(cfg: RobotConfig, data: mujoco.MjData) -> np.ndarray:
+    """Posición del TCP en el mundo (m)."""
+    return data.site(cfg.end_effector.tcp_name).xpos.copy()
