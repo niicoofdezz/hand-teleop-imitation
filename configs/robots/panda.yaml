@@ -13,6 +13,7 @@ gripper:
   actuator: actuator8
   ctrl_open: 255.0     # rango del actuador en panda.xml: 0..255
   ctrl_closed: 0.0
+  state_joint: finger_joint1   # articulación que dice cuánto está abierta (0..0.04 m)
 
 end_effector:
   body: hand                     # cuerpo al que se fija el punto de trabajo
@@ -20,3 +21,14 @@ end_effector:
   tcp_offset: [0.0, 0.0, 0.1034] # m, en el marco de 'hand': punto entre las yemas
 
 home_keyframe: home   # postura inicial definida en panda.xml
+
+# El controlador compensa el peso del brazo (como el Panda real)
+gravity_compensation: true
+
+# Cámaras montadas en el robot (se mueven con él)
+cameras:
+  wrist:
+    body: hand                 # va pegada a la mano
+    pos: [0.07, 0.0, 0.02]     # m, a un lado de la mano para ver los dedos y el objeto
+    euler: [180, 0, -90]       # grados: mirar hacia los dedos, con los dedos abajo en la imagen
+    fovy: 75                   # grados de campo de visión vertical (gran angular)

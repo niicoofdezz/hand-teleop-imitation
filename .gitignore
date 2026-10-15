@@ -14,3 +14,4 @@ outputs/
 
 # Código de terceros que clonaremos aparte
 third_party/
+*.egg-info/
