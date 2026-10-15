@@ -26,6 +26,11 @@ class TaskConfig:
     randomization: dict
     seeds: dict
     success: dict
+    cameras: dict
+    image_size: int
+    control_fps: int
+    max_episode_time: float
+    instruction: str
 
     @classmethod
     def from_yaml(cls, path: str | Path) -> "TaskConfig":
@@ -57,7 +62,8 @@ def _add_disc(spec: mujoco.MjSpec, d: dict) -> None:
     body.add_freejoint(name="disc_free")
     body.add_geom(name="disc_geom", type=GEOM.mjGEOM_CYLINDER,
                   size=[d["radius"], d["half_height"], 0], mass=d["mass"],
-                  friction=[d["friction"], 0.005, 0.0001], rgba=d["rgba"])
+                  friction=[d["friction"], d["torsional_friction"], 0.0001],
+                  condim=d["condim"], rgba=d["rgba"])
 
 
 def _add_box(spec: mujoco.MjSpec, b: dict) -> None:
@@ -74,11 +80,35 @@ def _add_box(spec: mujoco.MjSpec, b: dict) -> None:
         body.add_geom(name=name, type=GEOM.mjGEOM_BOX, pos=pos, size=size, rgba=b["rgba"])
 
 
+def _look_at(pos: list[float], target: list[float]) -> list[float]:
+    """Orienta una cámara para que mire de 'pos' a 'target'.
+
+    MuJoCo define la orientación con 'xyaxes': hacia dónde apunta la
+    derecha (x) y el arriba (y) de la imagen. Los calculamos así:
+      adelante = target - pos
+      derecha  = adelante x vertical del mundo
+      arriba   = derecha x adelante
+    """
+    forward = np.array(target, float) - np.array(pos, float)
+    forward /= np.linalg.norm(forward)
+    right = np.cross(forward, [0, 0, 1])
+    right /= np.linalg.norm(right)
+    up = np.cross(right, forward)
+    return [*right, *up]
+
+
+def _add_cameras(spec: mujoco.MjSpec, cameras: dict) -> None:
+    for name, cam in cameras.items():
+        spec.worldbody.add_camera(name=name, pos=cam["pos"],
+                                  xyaxes=_look_at(cam["pos"], cam["target"]), fovy=cam["fovy"])
+
+
 def build_scene(robot: RobotConfig, task: TaskConfig) -> mujoco.MjModel:
     spec = robot_spec(robot)
     _add_floor_and_light(spec)
     _add_disc(spec, task.disc)
     _add_box(spec, task.box)
+    _add_cameras(spec, task.cameras)
 
     # El keyframe 'home' del robot no conoce el disco: le añadimos su qpos
     # (posición xyz + cuaternión wxyz) para que siga siendo válido.
@@ -88,6 +118,11 @@ def build_scene(robot: RobotConfig, task: TaskConfig) -> mujoco.MjModel:
     model = spec.compile()
     validate_against_model(robot, model)
     return model
+
+
+def camera_names(robot: RobotConfig, task: TaskConfig) -> list[str]:
+    """Todas las cámaras que verá la política: las de la escena + las del robot."""
+    return [*task.cameras, *robot.cameras]
 
 
 def reset(robot: RobotConfig, task: TaskConfig, model: mujoco.MjModel,
