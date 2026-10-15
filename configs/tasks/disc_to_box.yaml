@@ -1,0 +1,38 @@
+# Tarea: coger un disco y dejarlo dentro de una caja abierta.
+# Diseñada para la precisión de una webcam (~7 cm de error): objeto grande y
+# redondo (no importa el giro) y caja amplia.
+
+name: disc_to_box
+
+disc:
+  radius: 0.030        # m -> 60 mm de diámetro (la pinza abre hasta 80 mm)
+  half_height: 0.015   # m -> 30 mm de alto
+  mass: 0.10           # kg
+  friction: 1.5        # alto para que no resbale entre los dedos
+  rgba: [0.90, 0.30, 0.10, 1.0]
+
+box:
+  inner_size: 0.20     # m, lado interior (cuadrada)
+  wall_height: 0.05    # m
+  wall_thickness: 0.01 # m
+  rgba: [0.20, 0.50, 0.90, 1.0]
+
+# Aleatorización al empezar cada episodio: centro (x, y) en metros, en el
+# marco del mundo (la base del robot está en el origen, mirando a +x).
+# Rangos que no se solapan: el disco a la derecha (y<0), la caja a la izquierda.
+randomization:
+  disc_x: [0.40, 0.60]
+  disc_y: [-0.25, -0.05]
+  box_x:  [0.40, 0.60]
+  box_y:  [0.15, 0.30]
+
+# Semillas: cada semilla genera una disposición. Los rangos NO se solapan,
+# así la evaluación es siempre en disposiciones que no se vieron al entrenar.
+seeds:
+  train_start: 0
+  test_start: 100000
+
+# Éxito: el centro del disco dentro del interior de la caja (con margen)
+# y apoyado (por debajo de la altura de las paredes).
+success:
+  margin: 0.01         # m que restamos al interior para no contar el borde

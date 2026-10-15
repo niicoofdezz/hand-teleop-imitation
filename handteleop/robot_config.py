@@ -73,11 +73,13 @@ class RobotConfig:
         return len(self.arm_joints)
 
 
-def build_model(cfg: RobotConfig) -> mujoco.MjModel:
-    """Carga el MJCF, añade el site del TCP y compila el modelo.
+def robot_spec(cfg: RobotConfig) -> mujoco.MjSpec:
+    """Carga el MJCF del robot y le añade el site del TCP (sin compilar).
 
-    Usamos MjSpec (edición del modelo desde Python) para no tocar los archivos
-    de Menagerie: el TCP es una decisión NUESTRA, así que vive en nuestro config.
+    Devolvemos el *spec* (modelo editable) para que la tarea pueda añadir
+    después suelo, objetos y cámaras antes de compilar.
+    Usamos MjSpec para no tocar los archivos de Menagerie: el TCP es una
+    decisión NUESTRA, así que vive en nuestro config.
     """
     spec = mujoco.MjSpec.from_file(str(cfg.mjcf))
     ee = cfg.end_effector
@@ -86,7 +88,12 @@ def build_model(cfg: RobotConfig) -> mujoco.MjModel:
         raise ValueError(f"[{cfg.name}] El cuerpo '{ee.body}' no existe en el MJCF")
     body.add_site(name=ee.tcp_name, pos=ee.tcp_offset, size=[0.01, 0.01, 0.01],
                   rgba=[1, 0, 0, 1])  # esfera roja: así se ve en el visor
-    model = spec.compile()
+    return spec
+
+
+def build_model(cfg: RobotConfig) -> mujoco.MjModel:
+    """Solo el robot (sin escena): útil para probar el config."""
+    model = robot_spec(cfg).compile()
     validate_against_model(cfg, model)
     return model
 
