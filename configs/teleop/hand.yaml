@@ -1,0 +1,24 @@
+# Teleoperación con la mano (webcam + MediaPipe).
+# 🧑 Estos valores los ajustas TÚ probando: dependen de tu mano, tu cámara y tu luz.
+
+camera:
+  index: 0                  # /dev/video0
+  width: 640
+  height: 480
+  fps: 30
+  fix_exposure: true        # aplica exposure_dynamic_framerate=0 al arrancar (evita bajar a 7.5 fps)
+
+model_path: assets/models/hand_landmarker.task
+
+# Filtro One Euro: quita el temblor sin añadir retraso al moverte rápido.
+#   min_cutoff: más bajo = más suave cuando estás quieto (pero más "lento")
+#   beta:       más alto = reacciona antes cuando te mueves rápido
+filter:
+  min_cutoff: 1.0
+  beta: 5.0
+  d_cutoff: 1.0
+
+# Pinza por pellizco, con histéresis (dos umbrales para que no parpadee)
+pinch:
+  close_below: 0.30         # se cierra si el pellizco baja de aquí
+  open_above: 0.45          # se abre si sube de aquí
